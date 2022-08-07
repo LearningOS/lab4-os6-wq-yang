@@ -85,7 +85,7 @@ impl Inode {
         disk_inode: &mut DiskInode,
         fs: &mut MutexGuard<EasyFileSystem>,
     ) {
-        if new_size < disk_inode.size {
+        if new_size <= disk_inode.size {
             return;
         }
         let blocks_needed = disk_inode.blocks_num_needed(new_size);
@@ -121,14 +121,28 @@ impl Inode {
             });
         self.modify_disk_inode(|root_inode| {
             // append file in the dirent
-            let file_count = (root_inode.size as usize) / DIRENT_SZ;
-            let new_size = (file_count + 1) * DIRENT_SZ;
+            let mut file_count = (root_inode.size as usize) / DIRENT_SZ;
+            let mut last_dirent = DirEntry::empty();
+            if file_count > 0 {
+                root_inode.read_at(
+                    (file_count - 1) * DIRENT_SZ,
+                    last_dirent.as_bytes_mut(),
+                    &self.block_device,
+                );
+                if !last_dirent.is_empty() {
+                    file_count += 1;
+                }
+            } else {
+                file_count += 1;
+            }
+
             // increase size
+            let new_size = file_count * DIRENT_SZ;
             self.increase_size(new_size as u32, root_inode, &mut fs);
             // write dirent
             let dirent = DirEntry::new(name, new_inode_id);
             root_inode.write_at(
-                file_count * DIRENT_SZ,
+                (file_count - 1) * DIRENT_SZ,
                 dirent.as_bytes(),
                 &self.block_device,
             );
@@ -163,15 +177,28 @@ impl Inode {
 
         // update root inode
         self.modify_disk_inode(|root_inode| {
-            // append file in the dirent
-            let file_count = (root_inode.size as usize) / DIRENT_SZ;
-            let new_size = (file_count + 1) * DIRENT_SZ;
+            let mut file_count = (root_inode.size as usize) / DIRENT_SZ;
+            let mut last_dirent = DirEntry::empty();
+            if file_count > 0 {
+                // read the last dir entry
+                root_inode.read_at(
+                    (file_count - 1) * DIRENT_SZ,
+                    last_dirent.as_bytes_mut(),
+                    &self.block_device,
+                );
+                if !last_dirent.is_empty() {
+                    file_count += 1;
+                }
+            } else {
+                file_count += 1;
+            }
             // increase size
+            let new_size = file_count * DIRENT_SZ;
             self.increase_size(new_size as u32, root_inode, &mut fs);
             // write dirent
             let dirent = DirEntry::new(name, inode.inode_id);
             root_inode.write_at(
-                file_count * DIRENT_SZ,
+                (file_count - 1) * DIRENT_SZ,
                 dirent.as_bytes(),
                 &self.block_device,
             );
@@ -227,8 +254,27 @@ impl Inode {
                 if dirent.name() == name {
                     // invalidate this file
                     let empty = DirEntry::empty();
+                    let mut buf = [0u8; DIRENT_SZ];
                     assert_eq!(
-                        root_inode.write_at(DIRENT_SZ * i, empty.as_bytes(), &self.block_device),
+                        root_inode.read_at(
+                            DIRENT_SZ * (file_count - 1),
+                            &mut buf,
+                            &self.block_device
+                        ),
+                        DIRENT_SZ
+                    );
+                    // overwrite this dir entry with the last dir entry
+                    assert_eq!(
+                        root_inode.write_at(DIRENT_SZ * i, &buf, &self.block_device),
+                        DIRENT_SZ,
+                    );
+                    // empty the last dir entry
+                    assert_eq!(
+                        root_inode.write_at(
+                            DIRENT_SZ * (file_count - 1),
+                            empty.as_bytes(),
+                            &self.block_device
+                        ),
                         DIRENT_SZ,
                     );
                     break;

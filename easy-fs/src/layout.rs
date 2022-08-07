@@ -138,7 +138,7 @@ impl DiskInode {
     }
     /// Get the number of data blocks that have to be allocated given the new size of data
     pub fn blocks_num_needed(&self, new_size: u32) -> u32 {
-        assert!(new_size >= self.size);
+        assert!(new_size > self.size);
         Self::total_blocks(new_size) - Self::total_blocks(self.size)
     }
     /// Get id of block given inner id
@@ -413,6 +413,9 @@ impl DirEntry {
             name: [0u8; NAME_LENGTH_LIMIT + 1],
             inode_number: 0,
         }
+    }
+    pub fn is_empty(&self) -> bool {
+        self.name().len() == 0
     }
     /// Crate a directory entry from name and inode number
     pub fn new(name: &str, inode_number: u32) -> Self {
