@@ -17,7 +17,7 @@ jobs:
         with:
           profile: minimal
           toolchain: nightly-2022-07-22
-          components: rust-src, llvm-tools-preview, riscv64gc-unknown-none-elf, 
+          components: rust-src, llvm-tools-preview
           target: riscv64gc-unknown-none-elf
       - uses: actions-rs/install@v0.1
         with:
