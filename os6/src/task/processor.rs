@@ -9,6 +9,7 @@ use super::{fetch_task, TaskStatus};
 use super::{TaskContext, TaskControlBlock};
 use crate::config::{BIG_STRIDE, MAX_SYSCALL_NUM};
 use crate::sync::UPSafeCell;
+use crate::timer::get_time_us;
 use crate::trap::TrapContext;
 use alloc::sync::Arc;
 use lazy_static::*;
@@ -57,6 +58,9 @@ pub fn run_tasks() {
             let mut task_inner = task.inner_exclusive_access();
             let next_task_cx_ptr = &task_inner.task_cx as *const TaskContext;
             task_inner.task_status = TaskStatus::Running;
+            if task_inner.task_st_time == usize::MAX {
+                task_inner.task_st_time = get_time_us();
+            }
             task_inner.pass += BIG_STRIDE as isize / task_inner.prio;
             drop(task_inner);
             // release coming task TCB manually
