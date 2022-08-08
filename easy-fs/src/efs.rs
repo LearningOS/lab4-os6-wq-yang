@@ -4,7 +4,6 @@ use super::{
 };
 use crate::BLOCK_SZ;
 use alloc::sync::Arc;
-use log::log;
 use spin::Mutex;
 
 /// An easy fs over a block device
