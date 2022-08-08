@@ -17,12 +17,9 @@ mod switch;
 #[allow(clippy::module_inception)]
 mod task;
 
-use crate::config::PAGE_SIZE;
 use crate::fs::{open_file, OpenFlags};
-use crate::mm::MapPermission;
-use crate::mm::VirtAddr;
+use crate::sbi::shutdown;
 pub use crate::syscall::process::TaskInfo;
-use crate::timer::get_time_us;
 use alloc::sync::Arc;
 use lazy_static::*;
 use manager::fetch_task;
@@ -69,6 +66,9 @@ pub fn exit_current_and_run_next(exit_code: i32) {
     inner.exit_code = exit_code;
     // do not move to its parent but under initproc
 
+    if task.pid.0 == INITPROC.pid.0 {
+        shutdown();
+    }
     // ++++++ access initproc TCB exclusively
     {
         let mut initproc_inner = INITPROC.inner_exclusive_access();
